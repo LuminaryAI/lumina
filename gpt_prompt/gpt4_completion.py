@@ -35,7 +35,8 @@ class GPT4Query:
         self.add_message("user", user_input)
         self.response = openai.ChatCompletion.create(
             model=self.model,
-            messages=self.messages
+            messages=self.messages,
+            stop=["\n", "###Env","###As", "###User"]
         )
         self.add_message("assistant", self.get_response_content())  # save the assistant's response
         return self.response

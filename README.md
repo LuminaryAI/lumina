@@ -42,7 +42,7 @@ An example of the system in action with the GPT-4 language model:
 gpt4_agent = GPT4Query(role_msg=GPT4_PROMPT)
 
 # Give the model an instruction
-obs = coupang.instruct('맥북에어 m2 들어간거 골라줘')
+obs = coupang.instruct('맥북에어 m2 들어간거 골라줘 200만원 이하로')
 
 for i in range(MAX_STEPS):
     # Query GPT-4

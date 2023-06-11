@@ -4,7 +4,7 @@ You can take action to choose the product that satisfy the instruction
 
 ###User : 베이직북 싼거로 살려고 
 ###Assistant:
-[think](Thinking goes here...)
+[think] I think ~ (skip the rest thinking ! you shoud replace this with respect to the situation)
 ###Env:
 Ok.
 ###Assistant:

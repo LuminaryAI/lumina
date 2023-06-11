@@ -173,7 +173,8 @@ Options:
         return pretty_string
 
     def step(self,action):
-
+        
+        action = action.strip()
         obs = ''
         if action.startswith('[search]'):
             match = re.search(r'\[search\](\w+)', action)
@@ -183,6 +184,12 @@ Options:
                 obs = coupang.search_product(result)
             else:
                 obs = 'Not a valid query'
+
+        elif action.startswith('[think]'):
+            obs= 'Ok.'
+        
+        elif action.startswith('[done]'):
+            obs= 'Done.'
 
         elif action.startswith('[click]'):
             if self.NOW_PAGE == 'SEARCH_RESULTS':
@@ -234,10 +241,15 @@ if __name__ == "__main__":
 
         # Query GPT-4
         gpt4_agent.query(obs)
-
         action_str = gpt4_agent.get_response_content()
         
         print('GPT4 action : ',action_str)
 
         obs = coupang.step(action_str)
+
+        print(f'Observation :\n{obs}')
+        print("-------")
+        if obs=='Done.':
+            break
+
 
