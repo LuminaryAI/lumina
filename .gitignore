@@ -1,0 +1,14 @@
+# Python bytecode files
+*.pyc
+
+# Python cache directory
+**/__pycache__/
+
+# PNG files
+*.png
+
+# .pth files
+*.pth
+
+# Environment variables (example)
+.env

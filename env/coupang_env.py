@@ -4,6 +4,7 @@ import json
 LUMINA_ROOT = os.environ.get('LUMINA_ROOT')
 sys.path.append(LUMINA_ROOT)
 from gpt_prompt.gpt4_completion import GPT4Query
+from const import *
 
 from selenium import webdriver
 from bs4 import BeautifulSoup
@@ -24,9 +25,13 @@ class CoupangEnv:
         self.driver = webdriver.Chrome(options=options)
         self.gpt_conn = GPT4Query()
 
+        self.NOW_PAGE = 'HOME'
+        self.productNum_to_url = dict()
+        self.last_search_result = None
+
     def search_product(self, product_name):
         product_name_encoded = urllib.parse.quote(product_name)
-        self.driver.get(f"{COUPANG_MAIN_URL}np/search?q={product_name_encoded}")
+        self.driver.get(f"{COUPANG_MAIN_URL}np/search?q={product_name_encoded}&sorter=scoreDesc")
         soup = BeautifulSoup(self.driver.page_source, 'html.parser')
 
         products = []
@@ -51,149 +56,188 @@ class CoupangEnv:
                 'detail_link' : re.sub(r'\s+', ' ', product_link).strip(),
             })
 
-        return products
+        for idx, product in enumerate(products):
+            self.productNum_to_url[idx+1] = product
+
+        self.NOW_PAGE = 'SEARCH_RESULTS'
+        obs = self.print_product_list(products, head=5)
+        self.last_search_result = obs
+        #return products
+        return obs
 
     def goto_detail_page(self, link):
         self.driver.get(link)
+        self.NOW_PAGE = 'DETAIL'
 
     def get_product_details(self):
+        if self.NOW_PAGE is not 'DETAIL':
+            return None
+
         soup = BeautifulSoup(self.driver.page_source, 'html.parser')
-        
-        # Find the script tag
-        script_tag = soup.find('script', text=lambda t: t and 'exports.sdp' in t)
-
-        # Check if script_tag is None
-        if script_tag is not None:
-            # Extract the content of the script tag
-            script_content = script_tag.string
-            
-            # Extract the value of exports.sdp
-            start_index = script_content.find('exports.sdp')
-            end_index = start_index + len('exports.sdp') + 3  # +3 to account for the '= {' characters
-            brace_count = 0
-            
-            # Loop through the characters from the start index
-            for i in range(end_index, len(script_content)):
-                if script_content[i] == '{':
-                    brace_count += 1
-                elif script_content[i] == '}':
-                    brace_count -= 1
-                    
-                    if brace_count == 0:
-                        end_index = i + 1  # Set the end index when brace_count reaches 0
-                        break
-            
-            exports_sdp = script_content[start_index:end_index]
-            script_dict = json.loads(exports_sdp)
-            # Print the value of exports.sdp
-            print(exports_sdp)
-        else:
-            print("No script tag containing 'exports.sdp' found.")
-
-        print(script_dict['name'])
-
-        exit()
-
-        product_details = {}
-
-        # Save soup as a .txt file
-        with open('/Users/seungyounshin/Desktop/lumina/detail_example.txt', 'w', encoding='utf-8') as file:
-            file.write(self.driver.page_source)
-
-
-        brand_name = soup.find('a', {'class': 'prod-brand-name'})
-        product_details['brand_name'] = brand_name.text if brand_name else 'N/A'
-
-        product_title = soup.find('span', {'class': 'prod-share__twitter'})
-        product_details['product_title'] = product_title.get('data-title') if product_title else 'N/A'
-
-        price = soup.find('span', {'class': 'total-price'}).find('strong')
-        product_details['price'] = price.text if price else 'N/A'
-
-        coupang_wow_price = soup.select_one('.prod-price .major-price-coupon')
-        if coupang_wow_price:
-            coupang_wow_price = coupang_wow_price.text.strip().split('\n')[0]
-        else:
-            coupang_wow_price = 'N/A'
-        product_details['coupang_wow_price'] = coupang_wow_price
-
-        when_to_arrive_div = soup.find('div', {'class': 'prod-pdd'})
-        if when_to_arrive_div:
-            when_to_arrive_em_tags = when_to_arrive_div.find_all('em', {'class': 'prod-txt-onyx'})
-            when_to_arrive = ' '.join(em.text for em in when_to_arrive_em_tags)
-        else:
-            when_to_arrive = 'N/A'
-        product_details['when_to_arrive'] = when_to_arrive
-
-        detail_option_button = soup.find('div', {'class': 'prod-option__selected  multiple'})
-        product_details['detail_option_button'] = dict()
-
-        quantity = soup.find('input', {'class': 'prod-quantity__input'})
-        
-        # Extract product option keys
-        product_option_keys = soup.find_all('div', {'class': 'prod-option__selected-container'})
-
-        for key_container in product_option_keys:
-            key = key_container.find('span', {'class': 'title'}).text.strip()
-            product_details['detail_option_button'][key] = []
-
-        # Extract product options
-        product_option_lists = soup.find_all('ul', {'class': 'prod-option__list'})
-
-        print(product_option_lists)
-        for i, option_list in enumerate(product_option_lists):
-            key = list(product_details['detail_option_button'].keys())[i]  # get the corresponding key
-            option_items = option_list.find_all('li', {'class': 'prod-option-dropdown-item'})
-
-            print(f'{key} :: {option_items}')
-
-            for item in option_items:
-                option = item.find('strong').text
-                product_details['detail_option_button'][key].append(option)
-
-
-        return product_details
-
-    def detail_reply(self, link=None):
-        self.goto_detail_page(link)
     
-        last_height = self.driver.execute_script("return document.body.scrollHeight")
 
-        while True:
-            self.driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
+        scripts = soup.find_all('script')
 
-            new_height = self.driver.execute_script("return document.body.scrollHeight")
-            if new_height == last_height:
-                break
-            last_height = new_height
+        # pattern to match "exports.sdp = { ... };"
+        pattern = re.compile(r"exports\.sdp = (.*?);", re.DOTALL)
+
+        data = None
+        for script in scripts:
+            match = re.search(pattern, script.text)
+            if match:
+                json_str = match.group(1)  # extract the JSON string
+                data = json.loads(json_str)  # parse the JSON string
+            #break # HARD-CODED
         
+        brand = data['brand']
+        itemId = data['itemId']
+        productId = data['productId']
+        product_name = data['itemName']
+        title = data['title']
+        option_raw = data['options']
+        ratingCount = data['ratingCount']
+        ratingAveragePercentage = data['ratingAveragePercentage']
+        
+        options_dict = {}
+        for option in option_raw['optionRows']:
+            option_name = option['name']
+            attributes = [attribute['name'] for attribute in option['attributes']]
+            options_dict[option_name] = attributes
+
+        detail_dict = {
+            'brand' : brand,
+            'itemId' : itemId,
+            'productId' : productId,
+            'title' : product_name,
+            'ratingCount' : ratingCount,
+            'ratingAveragePercentage' : ratingAveragePercentage,
+            'option' : options_dict
+        }
+
+        return self.pretty_product_details(detail_dict)
+    
+    def print_product_list(self,products, head=None):
+        
+        if head is not None and isinstance(head, int):
+            products_to_print = products[:head]
+        else:
+            products_to_print = products
+
+        obs_str = ''
+        for idx,product in enumerate(products_to_print):
+            name = product['name']
+            price = product['price']
+            rating = product['rating']
+            image = product['image']
+            link = product['detail_link']
+            
+            output = f"{Fore.BLUE}Name: {name}{Style.RESET_ALL}\n"
+            output += f"{Fore.GREEN}Price: {price}{Style.RESET_ALL}\n"
+            output += f"{Fore.YELLOW}Rating: {rating}{Style.RESET_ALL}\n"
+            output += f"{Fore.MAGENTA}Image: {image}{Style.RESET_ALL}\n"
+            output += f"{Fore.GREEN}Detail link: {link}{Style.RESET_ALL}\n"
+            #print(output)
+
+            obs_str += f'Product Number : [{idx+1}]\n'
+            obs_str += f"Name: {name}\n"
+            obs_str += f"Price: {price}\n"
+            obs_str += f"Rating: {rating}\n"
+            obs_str += (f'-')*8
+            obs_str += '\n'
+        
+        return obs_str
+
+    def click_product_num(self, num):
+        if len(self.productNum_to_url.keys()) < 1 :
+            return "Invalid action"
+    
+        product_info = self.productNum_to_url[num]
+        url = product_info['detail_link']
+
+        self.goto_detail_page(url) # DETAIL
+
+        detail_dict = self.get_product_details()
+
+        return detail_dict
+
+    def pretty_product_details(self, details):
+        options = "\n".join([f"\t{k}: {', '.join(v)}" for k, v in details["option"].items()])
+        pretty_string = f"""
+Title: {details["title"]}
+Rating Count: {details["ratingCount"]}
+Rating : {details["ratingAveragePercentage"]}
+Options: 
+{options}
+<back_to_search>
+        """
+        return pretty_string
+
+    def step(self,action):
+
+        obs = ''
+        if action.startswith('[search]'):
+            match = re.search(r'\[search\](\w+)', action)
+
+            if match:
+                result = match.group(1)
+                obs = coupang.search_product(result)
+            else:
+                obs = 'Not a valid query'
+
+        elif action.startswith('[click]'):
+            if self.NOW_PAGE == 'SEARCH_RESULTS':
+                match = re.search(r'\[click\](\w+)', action)
+                if match:
+                    result = match.group(1)
+                    try:
+                        obs = self.click_product_num(int(result))
+                        self.NOW_PAGE = 'DETAIL'
+                    except:
+                        obs = "Not a valid click button"
+
+            elif self.NOW_PAGE == 'DETAIL':
+                match = re.search(r'\[click\](\w+)', action)
+                if match:
+                    result = match.group(1)
+                    if 'back_to_search' in result.lower():
+                        # back to search 
+                        obs = self.last_search_result
+                        self.NOW_PAGE = 'SEARCH_RESULTS'
+
+        return obs
+    
+
+    def instruct(self,instruct):
+        return f"\'{instruct}\'"
+
 
 if __name__ == "__main__":
     coupang = CoupangEnv()
-    products = coupang.search_product('노트북')
-
-    print(f' len of product : {len(products)}')
-    for product in products:
-        name = product['name']
-        price = product['price']
-        rating = product['rating']
-        image = product['image']
-        link = product['detail_link']
-        
-        output = f"{Fore.BLUE}Name: {name}{Style.RESET_ALL}\n"
-        output += f"{Fore.GREEN}Price: {price}{Style.RESET_ALL}\n"
-        output += f"{Fore.YELLOW}Rating: {rating}{Style.RESET_ALL}\n"
-        output += f"{Fore.MAGENTA}Image: {image}{Style.RESET_ALL}\n"
-        output += f"{Fore.GREEN}Detail link: {link}{Style.RESET_ALL}\n"
-        
-        print(output)
-        print("======="*5)
+    MAX_STEPS = 10
     
-    # goto detail first page
-    print(f" goto product detail link : { products[-1]['detail_link'] }")
-    coupang.goto_detail_page('https://www.coupang.com/vp/products/4692708274?itemId=13761893691&vendorItemId=81397125516&sourceType=srp_product_ads&clickEventId=9cc34095-1e0d-4369-913a-461f6a6e76ed&korePlacement=15&koreSubPlacement=1&clickEventId=9cc34095-1e0d-4369-913a-461f6a6e76ed&korePlacement=15&koreSubPlacement=1&q=%EB%85%B8%ED%8A%B8%EB%B6%81&itemsCount=36&searchId=efbbb1e41e2e464b8e70a3970eaa3213&rank=0')
-    
-    print(coupang.get_product_details())
+    '''obs = coupang.step('[search]노트북')
+    print(obs)
+    print('----')
 
-    import time 
-    time.sleep(3)
+    obs = coupang.step('[click]2')
+    print(obs)
+    print('----')
+
+    obs = coupang.step('[click]Back_to_search')
+    print(obs)
+    print('----')'''
+
+    # test GPT4 to select macbook m2 version with lowest price 
+    gpt4_agent = GPT4Query(role_msg=GPT4_PROMPT)
+    obs = coupang.instruct('맥북에어 m2 들어간거 골라줘')
+    for i in range(MAX_STEPS):
+
+        # Query GPT-4
+        gpt4_agent.query(obs)
+
+        action_str = gpt4_agent.get_response_content()
+        
+        print('GPT4 action : ',action_str)
+
+        obs = coupang.step(action_str)
+
