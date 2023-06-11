@@ -1,14 +1,17 @@
-Coupang Product Search and Detail Extraction
+# ShopGPT 
+
+## COUPANG Env
+
 This repository provides a Python interface for interacting with the Coupang e-commerce platform. It utilizes web scraping techniques to extract details of various products and simulates actions such as searching for a product, clicking on product details and getting detailed product information. The extracted information includes product details like name, price, rating, image, link to product, brand, item ID, product ID, title, rating count, average rating percentage, and product options.
 
-Features
-Searching for products: This module allows you to search for any product on the Coupang platform and returns a list of products along with their basic details such as name, price, rating, image and link to product page.
+## Features
+* Searching for products: This module allows you to search for any product on the Coupang platform and returns a list of products along with their basic details such as name, price, rating, image and link to product page.
 
-Product Detail Extraction: It allows you to get detailed information about a specific product by clicking on the product. The detailed information includes brand, item ID, product ID, title, rating count, average rating percentage, and product options.
+* Product Detail Extraction: It allows you to get detailed information about a specific product by clicking on the product. The detailed information includes brand, item ID, product ID, title, rating count, average rating percentage, and product options.
 
-Integration with GPT-4: This project also integrates the powerful GPT-4 language model to generate actions based on natural language instructions.
+* Integration with GPT-4: This project also integrates the powerful GPT-4 language model to generate actions based on natural language instructions.
 
-Requirements
+## Requirements
 ```
 Python 3.6+
 selenium
