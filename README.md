@@ -20,7 +20,7 @@ colorama
 urllib
 ```
 
-How to use
+## How to use
 ```python
 from CoupangEnv import CoupangEnv
 
@@ -34,7 +34,7 @@ products = coupang.search_product("노트북")
 product_details = coupang.click_product_num(1) # clicking on first product
 ```
 
-Example
+## Example
 An example of the system in action with the GPT-4 language model:
 
 ```python
